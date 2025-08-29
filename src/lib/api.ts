@@ -1,95 +1,32 @@
-import { supabase } from './supabase';
+import axios from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000",
+});
 
-class APIClient {
-  private baseURL: string;
+// -------- DOCUMENT GENERATION --------
+export const generateDocument = async (userId: string, prompt: string) => {
+  const res = await api.post("/document/generate", {
+    user_id: userId,
+    prompt,
+  });
+  return res.data;
+};
 
-  constructor() {
-    this.baseURL = API_BASE_URL;
-  }
+// -------- OCR CONVERSION --------
+export const convertOCR = async (userId: string, file: File) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("user_id", userId);
 
-  private async getAuthHeaders() {
-    const { data: { session } } = await supabase.auth.getSession();
-    return {
-      'Content-Type': 'application/json',
-      ...(session && { 'Authorization': `Bearer ${session.access_token}` }),
-    };
-  }
+  const res = await api.post("/ocr/convert", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data;
+};
 
-  async ocrConvert(file: File) {
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    const { data: { session } } = await supabase.auth.getSession();
-    const headers: Record<string, string> = {};
-    if (session) {
-      headers['Authorization'] = `Bearer ${session.access_token}`;
-    }
-
-    const response = await fetch(`${this.baseURL}/ocr/convert`, {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error(`OCR conversion failed: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  async generateDocument(prompt: string) {
-    const headers = await this.getAuthHeaders();
-    const response = await fetch(`${this.baseURL}/document/generate`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ prompt }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Document generation failed: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  async getRecords() {
-    const headers = await this.getAuthHeaders();
-    const response = await fetch(`${this.baseURL}/records/list`, {
-      method: 'GET',
-      headers,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch records: ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
-  async downloadFile(fileId: string, filename: string) {
-    const headers = await this.getAuthHeaders();
-    const response = await fetch(`${this.baseURL}/files/download/${fileId}`, {
-      method: 'GET',
-      headers,
-    });
-
-    if (!response.ok) {
-      throw new Error(`File download failed: ${response.statusText}`);
-    }
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-  }
-}
-
-export const apiClient = new APIClient();
+// -------- RECORDS --------
+export const getRecords = async (userId: string) => {
+  const res = await api.get(`/records/${userId}`);
+  return res.data;
+};
