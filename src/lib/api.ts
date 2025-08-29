@@ -1,12 +1,12 @@
 import axios from "axios";
 
-const api = axios.create({
+const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000",
 });
 
 // -------- DOCUMENT GENERATION --------
 export const generateDocument = async (userId: string, prompt: string) => {
-  const res = await api.post("/document/generate", {
+  const res = await apiClient.post("/document/generate", {
     user_id: userId,
     prompt,
   });
@@ -19,7 +19,7 @@ export const convertOCR = async (userId: string, file: File) => {
   formData.append("file", file);
   formData.append("user_id", userId);
 
-  const res = await api.post("/ocr/convert", formData, {
+  const res = await apiClient.post("/ocr/convert", formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
   return res.data;
@@ -27,6 +27,6 @@ export const convertOCR = async (userId: string, file: File) => {
 
 // -------- RECORDS --------
 export const getRecords = async (userId: string) => {
-  const res = await api.get(`/records/${userId}`);
+  const res = await apiClient.get(`/records/${userId}`);
   return res.data;
 };
