@@ -9,6 +9,7 @@ export const OCRPage: React.FC = () => {
   const [extractedText, setExtractedText] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [processed, setProcessed] = useState(false);
+  const [downloadUrls, setDownloadUrls] = useState<{docx?: string, pdf?: string}>({});
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const selectedFile = acceptedFiles[0];
@@ -16,6 +17,7 @@ export const OCRPage: React.FC = () => {
       setFile(selectedFile);
       setExtractedText('');
       setProcessed(false);
+      setDownloadUrls({});
     }
   }, []);
 
@@ -38,6 +40,7 @@ export const OCRPage: React.FC = () => {
     try {
       const result = await apiClient.ocrConvert(file);
       setExtractedText(result.text || 'No text extracted');
+      setDownloadUrls(result.files || {});
       setProcessed(true);
       toast.success('Text extracted successfully!');
     } catch (error: any) {
@@ -47,53 +50,37 @@ export const OCRPage: React.FC = () => {
     }
   };
 
-  const handleDownload = async (format: 'docx' | 'pdf') => {
-    if (!extractedText) {
-      toast.error('No text to download');
+  const handleDownload = (format: 'docx' | 'pdf') => {
+    const url = downloadUrls[format];
+    if (!url) {
+      toast.error(`${format.toUpperCase()} file not available`);
       return;
     }
-
-    try {
-      const blob = new Blob([extractedText], { type: 'text/plain' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `extracted-text.${format === 'docx' ? 'txt' : 'txt'}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-      toast.success(`Downloaded as ${format.toUpperCase()}`);
-    } catch (error) {
-      toast.error('Download failed');
-    }
+    
+    const fullUrl = url.startsWith('http') ? url : `${import.meta.env.VITE_API_BASE_URL || 'https://ocr-doc-backend.onrender.com'}${url}`;
+    window.open(fullUrl, '_blank');
+    toast.success(`Opening ${format.toUpperCase()} file`);
   };
 
   const removeFile = () => {
     setFile(null);
     setExtractedText('');
     setProcessed(false);
+    setDownloadUrls({});
   };
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900">OCR Document Converter</h1>
-        <p className="mt-2 text-gray-600">
-          Upload images or PDFs to extract text content
-        </p>
+        <p className="mt-2 text-gray-600">Upload images or PDFs to extract text content</p>
       </div>
 
-      {/* File Upload Area */}
+      {/* File Upload Section */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-        <div
-          {...getRootProps()}
-          className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer ${
-            isDragActive
-              ? 'border-blue-400 bg-blue-50'
-              : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
-          }`}
-        >
+        <div {...getRootProps()} className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors cursor-pointer ${
+          isDragActive ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
+        }`}>
           <input {...getInputProps()} />
           
           {file ? (
@@ -104,16 +91,11 @@ export const OCRPage: React.FC = () => {
               </div>
               <div>
                 <p className="text-lg font-medium text-gray-900">{file.name}</p>
-                <p className="text-sm text-gray-500">
-                  {(file.size / 1024 / 1024).toFixed(2)} MB
-                </p>
+                <p className="text-sm text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
               </div>
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeFile();
-                }}
-                className="inline-flex items-center px-3 py-1 text-sm font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors"
+                onClick={(e) => { e.stopPropagation(); removeFile(); }}
+                className="inline-flex items-center px-3 py-1 text-sm font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100"
               >
                 <X className="h-4 w-4 mr-1" />
                 Remove
@@ -126,9 +108,7 @@ export const OCRPage: React.FC = () => {
                 <p className="text-lg font-medium text-gray-900">
                   {isDragActive ? 'Drop the file here' : 'Drop files here or click to upload'}
                 </p>
-                <p className="text-sm text-gray-500">
-                  Supports PNG, JPG, JPEG, and PDF files
-                </p>
+                <p className="text-sm text-gray-500">Supports PNG, JPG, JPEG, and PDF files</p>
               </div>
             </div>
           )}
@@ -139,7 +119,7 @@ export const OCRPage: React.FC = () => {
             <button
               onClick={handleConvert}
               disabled={loading}
-              className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center px-6 py-3 text-base font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               {loading ? (
                 <>
@@ -165,14 +145,16 @@ export const OCRPage: React.FC = () => {
             <div className="flex space-x-3">
               <button
                 onClick={() => handleDownload('docx')}
-                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
+                disabled={!downloadUrls.docx}
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Word
               </button>
               <button
                 onClick={() => handleDownload('pdf')}
-                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+                disabled={!downloadUrls.pdf}
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Download className="h-4 w-4 mr-2" />
                 PDF
@@ -185,6 +167,24 @@ export const OCRPage: React.FC = () => {
               {extractedText}
             </pre>
           </div>
+        </div>
+      )}
+
+      {/* Processing Status */}
+      {loading && (
+        <div className="bg-blue-50 rounded-xl p-6 text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600 mb-4" />
+          <p className="text-blue-800 font-medium">Processing your document...</p>
+          <p className="text-blue-600 text-sm mt-1">This may take a few moments</p>
+        </div>
+      )}
+
+      {/* Success Message */}
+      {processed && downloadUrls.docx && (
+        <div className="bg-green-50 rounded-xl p-6 text-center">
+          <CheckCircle className="h-8 w-8 mx-auto text-green-600 mb-4" />
+          <p className="text-green-800 font-medium">Text extracted successfully!</p>
+          <p className="text-green-600 text-sm mt-1">Download your files using the buttons above</p>
         </div>
       )}
     </div>

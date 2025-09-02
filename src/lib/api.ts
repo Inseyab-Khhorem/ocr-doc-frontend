@@ -2,66 +2,21 @@ import axios from "axios";
 import { createClient } from '@supabase/supabase-js';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000",
+  baseURL: import.meta.env.VITE_API_BASE_URL || "https://ocr-doc-backend.onrender.com",
 });
 
-// Supabase client for getting current user
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL!,
   import.meta.env.VITE_SUPABASE_ANON_KEY!
 );
 
-// Get current user ID
 const getCurrentUserId = async (): Promise<string> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
   return user.id;
 };
 
-// -------- DOCUMENT GENERATION --------
-export const generateDocument = async (userId: string, prompt: string) => {
-  const res = await api.post("/document/generate", {
-    user_id: userId,
-    prompt,
-  });
-  return res.data;
-};
-
-// -------- OCR CONVERSION --------
-export const convertOCR = async (userId: string, file: File) => {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("user_id", userId);
-
-  const res = await api.post("/ocr/convert", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-  return res.data;
-};
-
-// -------- RECORDS --------
-export const getRecords = async (userId: string) => {
-  const res = await api.get(`/records/${userId}`);
-  return res.data;
-};
-
-// Export apiClient object for OCRPage
-export const apiClient = {
-  ocrConvert: async (file: File) => {
-    const userId = await getCurrentUserId();
-    return convertOCR(userId, file);
-  },
-  generateDocument: async (prompt: string) => {
-    const userId = await getCurrentUserId();
-    return generateDocument(userId, prompt);
-  },
-  getRecords: async () => {
-    const userId = await getCurrentUserId();
-    return getRecords(userId);
-  },
-};
-
-// Attach Supabase JWT automatically to every request
+// Attach JWT to requests
 api.interceptors.request.use(async (config) => {
   const { data: { session } } = await supabase.auth.getSession();
   if (session?.access_token) {
@@ -69,3 +24,62 @@ api.interceptors.request.use(async (config) => {
   }
   return config;
 });
+
+export const apiClient = {
+  ocrConvert: async (file: File) => {
+    const userId = await getCurrentUserId();
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("user_id", userId);
+    
+    const res = await api.post("/ocr/convert", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data;
+  },
+
+  generateDocument: async (prompt: string, file?: File) => {
+    const userId = await getCurrentUserId();
+    
+    if (file) {
+      // Send as FormData if file included
+      const formData = new FormData();
+      formData.append("prompt", prompt);
+      formData.append("user_id", userId);
+      formData.append("file", file);
+      
+      const res = await api.post("/document/generate", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return res.data;
+    } else {
+      // Send as JSON if no file
+      const res = await api.post("/document/generate", {
+        prompt,
+        user_id: userId,
+      });
+      return res.data;
+    }
+  },
+
+  getRecords: async () => {
+    const res = await api.get("/records/");
+    return res.data;
+  },
+
+  // Admin functions
+  adminLogin: async (email: string, password: string) => {
+    const res = await api.post("/auth/admin/login", { email, password });
+    return res.data;
+  },
+
+  adminGetAllRecords: async () => {
+    const res = await api.get("/records/admin/all");
+    return res.data;
+  },
+
+  adminDeleteRecord: async (recordId: string) => {
+    const res = await api.delete(`/records/admin/record/${recordId}`);
+    return res.data;
+  },
+};
