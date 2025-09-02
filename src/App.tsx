@@ -9,6 +9,7 @@ import { SignupPage } from './pages/SignupPage';
 import { OCRPage } from './pages/OCRPage';
 import { GeneratePage } from './pages/GeneratePage';
 import { RecordsPage } from './pages/RecordsPage';
+import { AdminPage } from './pages/AdminPage'; // ADD THIS IMPORT
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,6 +54,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route path="/admin" element={<AdminPage />} /> {/* ADD THIS ROUTE */}
             <Route path="/" element={<Navigate to="/ocr" replace />} />
           </Routes>
         </Layout>
