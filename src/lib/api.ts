@@ -74,12 +74,18 @@ export const apiClient = {
   },
 
   adminGetAllRecords: async () => {
-    const res = await api.get("/records/admin/all");
+    const adminToken = localStorage.getItem('admin_token');
+    const res = await api.get("/records/admin/all", {
+      headers: adminToken ? { Authorization: `Bearer ${adminToken}` } : {}
+    });
     return res.data;
   },
 
   adminDeleteRecord: async (recordId: string) => {
-    const res = await api.delete(`/records/admin/record/${recordId}`);
+    const adminToken = localStorage.getItem('admin_token');
+    const res = await api.delete(`/records/admin/record/${recordId}`, {
+      headers: adminToken ? { Authorization: `Bearer ${adminToken}` } : {}
+    });
     return res.data;
   },
 };
